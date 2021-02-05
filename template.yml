@@ -1,0 +1,302 @@
+# This is the SAM template that represents the architecture of your serverless application
+# https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-template-basics.html
+
+# The AWSTemplateFormatVersion identifies the capabilities of the template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/format-version-structure.html
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  LzBot
+
+# Transform section specifies one or more macros that AWS CloudFormation uses to process your template
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/transform-section-structure.html
+Transform:
+- AWS::Serverless-2016-10-31
+
+Parameters:
+  Workload:
+    Type: String
+    Default: "dev"
+    Description: "The type of workload (environment) that this stack will run"
+
+# Resources declares the AWS resources that you want to include in the stack
+# https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/resources-section-structure.html
+Resources:
+  # https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+
+  
+  # custom slot for Greetings
+  greetingsSlot:
+    Type: Custom::LexSlotType
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: cfn-lex-slot-type-1-0-3-ServiceToken
+      name: !Sub
+        - '${AWS::StackName}_greetings_slot_${Workload}'
+        - Workload: !Ref Workload
+      description: Slot with a Greeting or Welcome message
+      valueSelectionStrategy: TOP_RESOLUTION
+      enumerationValues:
+      - value: Hi
+        synonyms:
+          - hi
+          - hello
+          - welcome
+          - hey
+      - value: How are you?
+        synonyms:
+          - hru
+          - hru?
+      - value: Bonjour
+        synonyms:
+          - hola
+          - hallo
+          - salute
+          - how do you do
+
+  # custom slot for QnA Yes Slot
+  qnaYesSlot:
+    Type: Custom::LexSlotType
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: cfn-lex-slot-type-1-0-3-ServiceToken
+      name: !Sub
+        - '${AWS::StackName}_QnA_Yes_slot_${Workload}'
+        - Workload: !Ref Workload
+      description: Yes Slot
+      valueSelectionStrategy: TOP_RESOLUTION
+      enumerationValues:
+      - value: yes
+        synonyms:
+          - ya
+          - yeah
+          - sure
+          - ok
+          - aye
+          - correct
+          - yep
+          - affirmative
+          
+  # custom slot for QnA No Slot
+  qnaNoSlot:
+    Type: Custom::LexSlotType
+    Properties:
+      ServiceToken:
+        Fn::ImportValue: cfn-lex-slot-type-1-0-3-ServiceToken
+      name: !Sub
+        - '${AWS::StackName}_QnA_No_slot_${Workload}'
+        - Workload: !Ref Workload
+      description: No Slot
+      valueSelectionStrategy: TOP_RESOLUTION
+      enumerationValues:
+      - value: no
+        synonyms:
+          - na
+          - nope
+          - negative
+          - non
+          - exit
+          - close
+
+  # auto welcome intent
+  autoWelcomeMessageIntent:
+      Type: Custom::LexIntent
+      DependsOn:
+      - greetingsSlot
+      Properties:
+        ServiceToken:
+          Fn::ImportValue: cfn-lex-intent-1-0-3-ServiceToken
+        name: !Sub
+        - '${AWS::StackName}_Auto_Welcome_Message_intent_${Workload}'
+        - Workload: !Ref Workload
+        fulfillmentActivity:
+          type: "ReturnIntent" # this will need to change for the fulfillment function
+        followUpPrompt:
+          prompt:
+            maxAttempts: 1
+            messages:
+              - content: "Hi. I am the LZ Bot !!"
+                contentType: "PlainText"
+                groupNumber: 1
+              - content: "Ok. Type a question or keyword to search information on AWS Landing Zone"
+                contentType: "PlainText"
+                groupNumber: 2
+          rejectionStatement:
+            messages:
+              - content: "Thanks. Have a nice day !!"
+                contentType: "PlainText"
+        sampleUtterances:
+          - "{Greetings}"
+        slots:
+        - name: Greetings
+          description: Welcome message
+          priority: 1
+          slotConstraint: Required
+          slotType: 
+            Ref: greetingsSlot
+          slotTypeVersion: "$LATEST"
+          valueElicitationPrompt:
+            maxAttempts: 2
+            messages:
+            - content: I am the LZ Bot !! What would you like to know about AWS Landing Zone?
+              contentType: PlainText
+  
+  # # Kendra Search intent
+  # kendraIntent:
+  #     Type: Custom::LexIntent
+  #     Properties:
+  #       ServiceToken:
+  #         Fn::ImportValue: cfn-lex-intent-1-0-3-ServiceToken
+  #       name: !Sub
+  #       - '${AWS::StackName}_Kendra_intent_${Workload}'
+  #       - Workload: !Ref Workload
+  #       fulfillmentActivity:
+  #         type: "ReturnIntent"
+  #       kendraConfiguration:
+  #         kendraIndex: "arn:aws:kendra:us-east-1:245599214094:index/c3d04c10-fd00-40ee-95d2-f7f974f64583"
+  #         role: "arn:aws:iam::245599214094:role/service-role/AmazonKendra-us-east-1-confluence-demo"
+  #       followUpPrompt:
+  #         prompt:
+  #           maxAttempts: 1
+  #           messages:
+  #             - content: "I found something matching your query:"
+  #               contentType: "PlainText"
+  #               groupNumber: 1
+  #             - content: "((x-amz-lex:kendra-search-response-question_answer-answer-2))"
+  #               contentType: "PlainText"
+  #               groupNumber: 2    
+  #             - content: "((x-amz-lex:kendra-search-response-document-2))"
+  #               contentType: "PlainText"
+  #               groupNumber: 2   
+  #             - content: "((x-amz-lex:kendra-search-response-answer-2))"
+  #               contentType: "PlainText"
+  #               groupNumber: 2
+  #             - content: "I hope the information was useful"
+  #               contentType: "PlainText"
+  #               groupNumber: 3                 
+  #             - content: "Would you like to search for anything else related to AWS Landing Zone?"
+  #               contentType: "PlainText"
+  #               groupNumber: 4  
+              
+  # yes intent
+  qnaYesIntent:
+      Type: Custom::LexIntent
+      DependsOn:
+      - qnaYesSlot
+      Properties:
+        ServiceToken:
+          Fn::ImportValue: cfn-lex-intent-1-0-3-ServiceToken
+        name: !Sub
+        - '${AWS::StackName}_QnA_Yes_intent_${Workload}'
+        - Workload: !Ref Workload
+        fulfillmentActivity:
+          type: "ReturnIntent"
+        followUpPrompt:
+          prompt:
+            maxAttempts: 1
+            messages:
+              - content: "Ok. Type a question or keyword to search information on AWS Landing Zone"
+                contentType: "PlainText"
+          rejectionStatement:
+            messages:
+              - content: "Ok. I am always here if you want any information on the AWS Landing Zones"
+                contentType: "PlainText"  
+        sampleUtterances:
+          - "{YesSlot}"
+          - I said {YesSlot}
+        slots:
+        - name: YesSlot
+          description: Yes Slot message
+          priority: 1
+          slotConstraint: Required
+          slotType: 
+            Ref: qnaYesSlot
+          slotTypeVersion: "$LATEST"
+          valueElicitationPrompt:
+            maxAttempts: 2
+            messages:
+            - content: Type a question or keyword to search information on AWS Landing Zone
+              contentType: PlainText
+  
+  # no intent
+  qnaNoIntent:
+      Type: Custom::LexIntent
+      DependsOn:
+      - qnaNoSlot
+      Properties:
+        ServiceToken:
+          Fn::ImportValue: cfn-lex-intent-1-0-3-ServiceToken
+        name: !Sub
+        - '${AWS::StackName}_QnA_No_intent_${Workload}'
+        - Workload: !Ref Workload
+        fulfillmentActivity:
+          type: "ReturnIntent"
+        followUpPrompt:
+          prompt:
+            maxAttempts: 1
+            messages:
+              - content: "Ok. I am always here if you want any information on the AWS Landing Zones"
+                contentType: "PlainText"
+          rejectionStatement:
+            messages:
+              - content: "Ok. I am always here if you want any information on the AWS Landing Zones"
+                contentType: "PlainText"  
+        sampleUtterances:
+          - "{NoSlot}"
+          - I said {NoSlot}
+        slots:
+        - name: NoSlot
+          description: No Slot message
+          priority: 1
+          slotConstraint: Required
+          slotType: 
+            Ref: qnaNoSlot
+          slotTypeVersion: "$LATEST"
+          valueElicitationPrompt:
+            maxAttempts: 2
+            messages:
+            - content: Type a question or keyword to search information on AWS Landing Zone
+              contentType: PlainText
+
+  # Lex bot itself
+  KendraSearchBot:
+    Type: Custom::LexBot
+    DependsOn:
+      - autoWelcomeMessageIntent
+      - qnaYesIntent
+      - qnaNoIntent
+      # - kendraIntent
+    Properties: 
+      ServiceToken:
+        Fn::ImportValue: cfn-lex-bot-1-0-3-ServiceToken
+      name: !Sub
+        - '${AWS::StackName}_Kendra_Search_Bot_${Workload}'
+        - Workload: !Ref Workload
+      abortStatement:
+        messages:
+          - content: "Sorry, I could not understand. Please contact customer support."
+            contentType: "PlainText"
+      childDirected: false
+      clarificationPrompt:
+        maxAttempts: 2
+        messages:
+          - content: "Sorry. I could not find anything related to that."
+            contentType: "PlainText"
+          - content: "Sorry, I couldn't find any matching or related information. Would you like to search something else?"
+            contentType: "PlainText"
+      description: Kendra Search Bot
+      idleSessionTTLInSeconds: 300
+      intents:
+        - intentName: 
+           Ref: autoWelcomeMessageIntent
+          intentVersion: "$LATEST" # always use the latest intent
+        - intentName: 
+           Ref: qnaYesIntent
+          intentVersion: "$LATEST"
+        - intentName: 
+           Ref: qnaNoIntent
+          intentVersion: "$LATEST"
+        # - intentName: 
+        #    Ref: kendraIntent
+        #   intentVersion: "$LATEST"
+      locale: en-US 
+      processBehavior: "BUILD" # build automatically, although this doesn't trigger if the bot itself isn't changed
