@@ -15,9 +15,12 @@ _Optional_
 ### Custom resources
 AWS Lex isn't included as a resource in Cloudformation.
 
-This project uses custom resources for [lex-bot](https://github.com/danblundell/cfn-lex-bot), [lex-intent](https://github.com/danblundell/cfn-lex-intent), and [lex-slot-type](https://github.com/danblundell/cfn-lex-slot-type)
+This project uses custom resources for [lex-bot](https://github.com/danblundell/cfn-lex-bot), [lex-intent](https://github.com/danblundell/cfn-lex-intent), and [lex-slot-type](https://github.com/danblundell/cfn-lex-slot-type). The code from github is added to the repository \src\CustomResources
 
 To be able to deploy this Cloudformation stack, you'll need to have the custom resources deployed to your AWS Account in the same region first.
+
+How to deploy?
+Add the 3 json files to an S3 bucket. Create 3 separate CloudFormation stacks with each of these json files. Now, you will have a slot-type, intent and bot stack.
 
 ## Project structure
 It includes the following files and folders:
@@ -25,7 +28,7 @@ It includes the following files and folders:
 - `src` - Code for the application's Lambda function(s).
 - `events` - Invocation events that you can use to invoke the functions locally.
 - `__tests__` - Unit tests. 
-- `template.yml` - A template that defines the application's AWS resources for deployment.
+- `template.yml` - A template that defines the ChatBot application's AWS resources for deployment.
 
 Resources for this project are defined in the `template.yml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
 
